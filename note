@@ -1,0 +1,570 @@
+#!/bin/bash
+# Simple script to check for mismatched extensions
+# Created by Dr. Phil Polstra 
+# for PentesterAcademy.com
+
+find "$1" -print0 | while read -d $'\0' file
+do
+	resp=$(file "$file")
+	filename=$(basename "$file")
+	ext="${filename##*.}"
+	# check for mismatch
+	if [ "${ext^^}" == "PNG" ]; then
+		if [[ ! $resp =~ "PNG image" ]]; then
+			echo "*** $filename is mismatched"
+			echo $resp
+		fi
+	elif [ "${ext^^}" == "JPG" ]; then
+		if [[ ! $resp =~ "JPEG image" ]]; then
+			echo "*** $filename is mismatched"
+			echo $resp
+		fi
+	elif [ "${ext^^}" == "JPEG" ]; then
+		if [[ ! $resp =~ "JPEG image" ]]; then
+			echo "*** $filename is mismatched"
+			echo $resp
+		fi
+	elif [ "${ext^^}" == "GIF" ]; then
+		if [[ ! $resp =~ "GIF image" ]]; then
+			echo "*** $filename is mismatched"
+			echo $resp
+		fi
+	elif [ "${ext^^}" == "MP4" ]; then
+		if [[ ! $resp =~ "MPEG v4" ]]; then
+			echo "*** $filename is mismatched"
+			echo $resp
+		fi
+	elif [ "${ext^^}" == "MP3" ]; then
+		if [[ ! $resp =~ "MPEG" ]]; then
+			echo "*** $filename is mismatched"
+			echo $resp
+		fi
+	elif [ "${ext^^}" == "PDF" ]; then
+		if [[ ! $resp =~ "PDF document" ]]; then
+			echo "*** $filename is mismatched"
+			echo $resp
+		fi
+	elif [ "${ext^^}" == "DOC" ]; then
+		if [[ ! $resp =~ "Composite Document File" ]]; then
+		   if [[ ! $resp =~ "Microsoft WinWord" ]]; then
+			   echo "*** $filename is mismatched"
+			   echo $resp
+			fi
+		fi
+	elif [ "${ext^^}" == "DOCX" ]; then
+		if [[ ! $resp =~ "Microsoft Word 2007" ]]; then
+			echo "*** $filename is mismatched"
+			echo $resp
+		fi
+	elif [ "${ext^^}" == "XLS" ]; then
+		if [[ ! $resp =~ "Composite Document File" ]]; then
+		   if [[ ! $resp =~ "Microsoft Excel" ]]; then
+			   echo "*** $filename is mismatched"
+			   echo $resp
+			fi
+		fi
+	elif [ "${ext^^}" == "XLSX" ]; then
+		if [[ ! $resp =~ "Microsoft Excel 2007" ]]; then
+			echo "*** $filename is mismatched"
+			echo $resp
+		fi
+	elif [ "${ext^^}" == "PPT" ]; then
+		if [[ ! $resp =~ "Composite Document File" ]]; then
+		   if [[ ! $resp =~ "Microsoft PowerPoint" ]]; then
+			   echo "*** $filename is mismatched"
+			   echo $resp
+			fi
+		fi
+	elif [ "${ext^^}" == "PPTX" ]; then
+		if [[ ! $resp =~ "Microsoft PowerPoint 2007" ]]; then
+			echo "*** $filename is mismatched"
+			echo $resp
+		fi
+	elif [ "${ext^^}" == "EXE" ]; then
+		if [[ ! $resp =~ "executable" ]]; then
+			echo "*** $filename is mismatched"
+			echo $resp
+		fi
+	fi
+	
+done#
+
+
+
+
+!/bin/bash
+#
+# start-case.sh
+usage () {
+echo “usage: $0 <case number>”
+echo “Simple script to create case folder and start listeners”
+exit 1
+}
+if [ $# -lt 1 ] ; then
+usage
+else
+echo “Starting case $1”
+fi
+#if the directory doesn’t exist create it
+if [ ! -d $1 ] ; then
+mkdir $1
+fi
+# create the log listener
+`nc -k -l 4444 >> $1/log.txt` &
+echo “Started log listener for case $1 on $(date)” | nc localhost 4444
+# start the file listener
+`./start-file-listener.sh $1` &
+
+
+
+#!/bin/bash
+#
+# start-file-listener.sh
+#
+# Simple script to start a new file
+# listener. Intended to be
+# used as part of initial live response.
+
+# When a filename is sent to port 5555 a transfer on 5556
+# is expected to follow.
+usage () {
+echo “usage: $0 <case name>”
+echo “Simple script to start a file listener”
+exit 1
+}
+# did you specify a case name?
+if [ $# -lt 1 ] ; then
+usage
+fi
+while true
+do
+filename=$(nc -l 5555)
+nc -l 5556 > $1/$(basename $filename)
+done
+
+
+
+#!/bin/bash
+#
+# close-case.sh
+#
+# Simple script to start shut down listeners.
+# Intended to be used as part of initial live response.
+
+echo “Shutting down listeners at $(date) at user request” | nc localhost 4444
+killall start-case.sh
+killall start-file-listener.sh
+killall nc
+
+
+# setup-client.sh
+#
+# Simple script to set environment variables for a
+# system under investigation. Intended to be
+# used as part of initial live response.
+
+usage () {
+echo “usage: source $0 <forensics workstation IP> [log port] [filename port]
+[file transfer port]”
+echo “Simple script to set variables for communication to forensics
+workstation”
+exit 1
+}
+# did you specify a file?
+if [ $# -lt 1 ] ; then
+usage
+fi
+export RHOST=$1
+if [ $# -gt 1 ] ; then
+export RPORT=$2
+else
+export RPORT=4444
+fi
+if [ $# -gt 2 ] ; then
+export RFPORT=$3
+else
+export RFPORT=5555
+fi
+if [ $# -gt 3 ] ; then
+export RFTPORT=$4
+else
+export RFTPORT=5556
+fi
+
+# send-log.sh
+#
+# Simple script to send a new log entry
+# to listener on forensics workstation. Intended to be
+# used as part of initial live response.
+
+# defaults primarily for testing
+[ -z “$RHOST” ] && { export RHOST=localhost; }
+[ -z “$RPORT” ] && { export RPORT=4444; }
+usage () {
+echo “usage: $0 <command or script>”
+echo “Simple script to send a log entry to listener”
+exit 1
+}
+# did you specify a command?
+if [ $# -lt 1 ] ; then
+usage
+else
+echo -e “++++Sending log for $@ at $(date) ++++\n $($@) \n–-end–-\n” | nc
+$RHOST $RPORT
+fi
+
+
+# send-file.sh
+#
+# Simple script to send a new file
+# to listener on forensics workstation. Intended to be
+# used as part of initial live response.
+
+# defaults primarily for testing
+[ -z “$RHOST” ] && { export RHOST=localhost; }
+[ -z “$RPORT” ] && { export RPORT=4444; }
+[ -z “$RFPORT” ] && { export RFPORT=5555; }
+[ -z “$RFTPORT” ] && { export RFTPORT=5556; }
+usage () {
+echo “usage: $0 <filename>”
+echo “Simple script to send a file to listener”
+exit 1
+}
+# did you specify a file?
+if [ $# -lt 1 ] ; then
+usage
+fi
+#log it
+echo “Attempting to send file $1 at $(date)” | nc $RHOST $RPORT
+#send name
+echo $(basename $1) | nc $RHOST $RFPORT
+#give it time
+sleep 5
+nc $RHOST $RFTPORT < $1
+
+
+
+
+# initial-scan.sh
+#
+# Simple script to collect basic information as part of
+# initial live incident response.
+
+usage () {
+echo “usage: $0 [listening host]”
+echo “Simple script to send a log entry to listener”
+exit 1
+}
+# did you specify a listener IP?
+if [ $# -gt 1 ] || [ “$1” == “—help” ] ; then
+usage
+fi
+# did you specify a listener IP?
+if [ “$1” != “” ] ; then
+source setup-client.sh $1
+fi
+# now collect some info!
+send-log.sh date
+send-log.sh uname -a
+send-log.sh ifconfig -a
+send-log.sh netstat -anp
+send-log.sh lsof -V
+send-log.sh ps -ef
+send-log.sh netstat -rn
+send-log.sh route
+send-log.sh lsmod
+send-log.sh df
+send-log.sh mount
+send-log.sh w
+send-log.sh last
+send-log.sh lastb
+send-log.sh cat /etc/passwd
+send-log.sh cat /etc/shadow
+
+
+
+
+# send-fileinfo.sh
+#
+# Simple script to collect file information as part of
+# initial live incident response.
+# Warning: This script might take a long time to run!
+# by 
+
+usage () {
+echo “usage: $0 <starting directory>”
+echo “Simple script to send file information to a log listener”
+exit 1
+}
+if [ $# -lt 1 ] ; then
+usage
+fi
+# semicolon delimited file which makes import to spreadsheet easier
+# printf is access date, access time, modify date, modify time,
+# create date, create time, permissions, user id, user name,
+# group id, group name, file size, filename and then line feed
+# if you want nice column labels in your spreadsheet, paste the following
+# line (minus #) at start of your CSV file
+#Access Date;Access Time;Modify Date;Modify Time;Create Date;Create
+Time;Permissions;UID;Username;GID;Groupname;Size;File
+send-log.sh find $1 -printf “%Ax;%AT;%Tx;%TT;%Cx;%CT;%m;%U;%u;%G;%g;%s;%p\n”
+
+
+
+# send-history.sh
+#
+# Simple script to send all user bash history files as part of
+# initial live incident response.
+
+usage () {
+echo “usage: $0 “
+echo “Simple script to send user history files to a log listener”
+exit 1
+}
+if [ $# -gt 0 ] ; then
+usage
+fi
+# find only files, filename is .bash_history
+# execute echo, cat, and echo for all files found
+send-log.sh find /home -type f -regextype posix-extended -regex \
+‘/home/[a-zA-Z.]+/.bash_history’ \
+-exec echo -e “–dumping history file {} –\n” \; \
+-exec cat {} \; -exec echo -e “–end of dump for history file {} –\n” \;
+# repeat for the admin user
+send-log.sh find /root -type f -maxdepth 1 -regextype posix-extended \
+-regex ‘/root/.bash_history’ \
+-exec echo -e “–dumping history file {} –\n” \; \
+-exec cat {} \; -exec echo -e “–end of dump for history file {} –\n” \;
+
+
+
+# send-logfiles.sh
+#
+# Simple script to send all logs as part of
+# initial live incident response.
+# Warning: This script might take a long time to run!
+
+usage () {
+echo “usage: $0 “
+echo “Simple script to send log files to a log listener”
+exit 1
+}
+if [ $# -gt 0 ] ; then
+usage
+fi
+# find only files, exclude files with numbers as they are old logs
+# execute echo, cat, and echo for all files found
+send-log.sh find /var/log -type f -regextype posix-extended \
+-regex ‘/var/log/[a-zA-Z.]+(/[a-zA-Z.]+)*’ \
+-exec echo -e “–dumping logfile {} –\n” \; \
+-exec cat {} \; -exec echo -e “–end of dump for logfile {} –\n” \;
+
+
+# send-sha1sum.sh
+#
+# Simple script to calculate sha1 sum as part of
+# initial live incident response.
+# Warning: This script might take a long time to run!
+# by Dr. Phil Polstra (@ppolstra) as developed for
+# PentesterAcademy.com.
+usage () {
+echo “usage: $0 <starting directory>”
+echo “Simple script to send SHA1 hash to a log listener”
+exit 1
+}
+if [ $# -lt 1 ] ; then
+usage
+fi
+# find only files, don’t descend to other filesystems,
+# execute command sha1sum -b <filename> for all files found
+send-log.sh find $1 -xdev -type f -exec sha1sum -b {} \;
+
+
+
+
+
+#!/usr/bin/python
+#
+#mount-image.py
+# This is a simple Python script that will
+# attempt to mount partitions from an image file.
+# Images are mounted read-only.
+#
+
+import sys
+import os.path
+import subprocess
+import struct
+“””
+Class MbrRecord: decodes a partition record from a Master Boot Record
+Usage: rec = MbrRecord(sector, partno) where
+sector is the 512 byte or greater sector containing the MBR
+partno is the partition number 0-3 of interest
+rec.printPart() prints partition information
+“””
+class MbrRecord():
+def __init__(self, sector, partno):
+self.partno = partno
+# first record at offset 446 & records are 16 bytes
+offset = 446 + partno * 16
+self.active = False
+# first byte == 0x80 means active (bootable)
+if sector[offset] == ‘\x80’:
+self.active = True
+self.type = ord(sector[offset+4])
+self.empty = False
+# partition type == 0 means it is empty
+if self.type == 0:
+self.empty = True
+# sector values are 32-bit and stored in little endian format
+self.start = struct.unpack(‘<I’, sector[offset + 8: \
+offset + 12])[0]
+self.sectors = struct.unpack(‘<I’, sector[offset + 12: \
+offset + 16])[0]
+def printPart(self):
+if self.empty == True:
+print(“<empty>”)
+else:
+outstr = “”
+if self.active == True:
+outstr += “Bootable:”
+outstr += “Type “ + str(self.type) + “:”
+outstr += “Start “ + str(self.start) + “:”
+outstr += “Total sectors “ + str(self.sectors)
+print(outstr)
+def usage():
+print(“usage “ + sys.argv[0] +
+“ <image file>\nAttempts to mount partitions from an image file”)
+exit(1)
+def main():
+if len(sys.argv) < 2:
+usage()
+# read first sector
+if not os.path.isfile(sys.argv[1]):
+print(“File “ + sys.argv[1] + “ cannot be opened for reading”)
+exit(1)
+with open(sys.argv[1], ‘rb’) as f:
+sector = str(f.read(512))
+if (sector[510] == “\x55” and sector[511] == “\xaa”):
+print(“Looks like a MBR or VBR”)
+# if it is an MBR bytes 446, 462, 478, and 494 must be 0x80 or 0x00
+if (sector[446] == ‘\x80’ or sector[446] == ‘\x00’) and \
+(sector[462] == ‘\x80’ or sector[462] == ‘\x00’) and \
+(sector[478] == ‘\x80’ or sector[478] == ‘\x00’) and \
+(sector[494] == ‘\x80’ or sector[494] == ‘\x00’):
+print(“Must be a MBR”)
+parts = [MbrRecord(sector, 0), MbrRecord(sector, 1), \
+MbrRecord(sector, 2), MbrRecord(sector, 3)]
+for p in parts:
+p.printPart()
+if not p.empty:
+notsupParts = [0x05, 0x0f, 0x85, 0x91, 0x9b, 0xc5, 0xe4, 0xee]
+if p.type in notsupParts:
+print(“Sorry GPT and extended partitions are “ + “not supported by
+this script!”)
+else:
+mountpath = ‘/media/part%s’ % str(p.partno)
+# if the appropriate directory doesn’t exist create it
+if not os.path.isdir(mountpath):
+subprocess.call([‘mkdir’, mountpath])
+mountopts = ‘loop,ro,noatime,offset=%s’ % \
+str(p. start * 512)
+subprocess.call([‘mount’, ‘-o’, \
+mountopts, sys.argv[1], mountpath])
+else:
+print(“Appears to be a VBR\nAttempting to mount”)
+if not os.path.isdir(‘/media/part1’):
+subprocess.call([‘mkdir’, ‘/media/part1’])
+subprocess.call([‘mount’, ‘-o’, ‘loop,ro,noatime’, \
+sys.argv[1], ‘/media/part1’])
+if __name__ == “__main__”:
+main()
+
+
+
+
+
+
+
+
+
+
+
+
+
+#!/bin/bash
+#
+# getmacs.sh
+#
+# Simple shell script to extract MAC times from an image to
+# a CSV file for import into a spreadsheet or database.
+#
+
+usage () {
+echo “usage: $0 <starting directory>”
+echo “Simple script to get MAC times from an image and output CSV”
+exit 1
+}
+if [ $# -lt 1 ] ; then
+usage
+fi
+# semicolon delimited file which makes import to spreadsheet easier
+# printf is access date, access time, modify date, modify time,
+# create date, create time, permissions, user id, user name,
+# group id, group name, file size, filename and then line feed
+olddir=$(pwd)
+cd $1 # this avoids having the mount point added to every filename
+printf “Access Date;Access Time;Modify Date;Modify Time;Create Date;\
+Create Time;Permissions;User ID;Group ID;File Size;Filename\n”
+find ./ -printf “%Ax;%AT;%Tx;%TT;%Cx;%CT;%m;%U;%G;%s;%p\n”
+cd $olddir
+
+
+
+
+#!/bin/bash
+#
+# get-histories.sh
+#
+# Simple script to get all user bash history files and .
+
+usage () {
+echo “usage: $0 <mount point of root> [database name]”
+echo “Simple script to get user histories and \
+optionally store them in the database”
+exit 1
+}
+if [ $# -lt 1 ] ; then
+usage
+fi
+# find only files, filename is .bash_history
+# execute echo, cat, and echo for all files found
+olddir=$(pwd)
+cd $1
+find home -type f -regextype posix-extended \
+-regex “home/[a-zA-Z.]+(/.bash_history)” \
+-exec awk ‘{ print “{};” $0}’ {} \; \
+| tee /tmp/histories.csv
+# repeat for the admin user
+find root -type f -regextype posix-extended \
+-regex “root(/.bash_history)” \
+-exec awk ‘{ print “{};” $0}’ {} \; \
+| tee -a /tmp/histories.csv
+cd $olddir
+if [ $# -gt 1 ] ; then
+chown mysql:mysql /tmp/histories.csv
+cat << EOF | mysql $2 -u root -p
+create table if not exists ‘histories’ (
+historyFilename varchar(2048) not null,
+historyCommand varchar(2048) not null,
+recno bigint not null auto_increment,
+primary key(recno)
+);
+load data infile “/tmp/histories.csv”
+into table histories
+fields terminated by ‘;’
+enclosed by ‘”’
+lines terminated by ‘\n’;
+EOF
+fi
+
